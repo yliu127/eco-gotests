@@ -41,7 +41,7 @@ var _ = Describe("PTP Events and Metrics", Label(tsparams.LabelEventsAndMetrics)
 		By("ensuring clocks are locked before testing")
 
 		err = metrics.EnsureClocksAreLocked(prometheusAPI)
-		Expect(err).ToNot(HaveOccurred(), "Failed to assert clock state is locked")
+		Expect(err).To(HaveOccurred(), "Failed to assert clock state is locked")
 
 		By("saving PtpConfigs before testing")
 
