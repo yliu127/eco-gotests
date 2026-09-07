@@ -12,6 +12,7 @@ import (
 	"github.com/rh-ecosystem-edge/eco-goinfra/pkg/reportxml"
 	"github.com/rh-ecosystem-edge/eco-gotests/tests/internal/cluster"
 	"github.com/rh-ecosystem-edge/eco-gotests/tests/lca/imagebasedupgrade/cnf/internal/cnfclusterinfo"
+	"github.com/rh-ecosystem-edge/eco-gotests/tests/lca/imagebasedupgrade/cnf/internal/cnfhelper"
 	. "github.com/rh-ecosystem-edge/eco-gotests/tests/lca/imagebasedupgrade/cnf/internal/cnfinittools"
 	"github.com/rh-ecosystem-edge/eco-gotests/tests/lca/imagebasedupgrade/cnf/upgrade-talm/internal/tsparams"
 	"github.com/rh-ecosystem-edge/eco-gotests/tests/lca/imagebasedupgrade/internal/nodestate"
@@ -44,9 +45,17 @@ var _ = Describe(
 				ibu, err = lca.PullImageBasedUpgrade(TargetSNOAPIClient)
 				Expect(err).NotTo(HaveOccurred(), "error pulling ibu resource from cluster")
 			})
+
+			By("Ensure spoke IBU is Idle and Prep is a valid next stage", func() {
+				err = cnfhelper.EnsureSpokeReadyForIbgu(cnfhelper.DefaultSpokeIBUReadyTimeout)
+				Expect(err).ToNot(HaveOccurred(),
+					"Spoke IBU is not ready for Prep; leftover abort/finalize state can block this test")
+			})
 		})
 
 		AfterEach(func() {
+			var sriovRecoveredBeforeAbort bool
+
 			By("Deleting IBGU on target hub cluster", func() {
 				newIbguBuilder := ibgu.NewIbguBuilder(TargetHubAPIClient,
 					tsparams.IbguName, tsparams.IbguNamespace).
@@ -57,24 +66,27 @@ var _ = Describe(
 
 				_, err = newIbguBuilder.DeleteAndWait(1 * time.Minute)
 				Expect(err).ToNot(HaveOccurred(), "Failed to delete prep-upgrade ibgu on target hub cluster")
+			})
 
-				// Check if IBU is already Idle after auto-rollback
-				ibu, err = lca.PullImageBasedUpgrade(TargetSNOAPIClient)
-				Expect(err).ToNot(HaveOccurred(), "Failed to pull IBU resource")
+			ibu, err = lca.PullImageBasedUpgrade(TargetSNOAPIClient)
+			Expect(err).ToNot(HaveOccurred(), "Failed to pull IBU resource")
 
-				// Check the Idle condition status
-				isIdle := false
+			if !cnfhelper.IsSpokeIBUReadyForPrep(ibu.Object) {
+				By("Recover SR-IOV before abort cleanup to unblock IPC", func() {
+					err = cnfhelper.RecoverSpokeSriovAfterStaterootRollback(cnfhelper.DefaultSpokeIBUReadyTimeout)
+					Expect(err).NotTo(HaveOccurred(),
+						"SR-IOV did not recover before abort cleanup; abort IBGU may time out")
 
-				for _, condition := range ibu.Object.Status.Conditions {
-					if condition.Type == "Idle" && condition.Status == "True" {
-						isIdle = true
+					sriovRecoveredBeforeAbort = true
+				})
 
-						break
-					}
-				}
+				By("Wait for OADP backup storage to be Available before abort", func() {
+					err = cnfhelper.WaitForOADPBackupStorageAvailable(cnfhelper.DefaultSpokeIBUReadyTimeout)
+					Expect(err).ToNot(HaveOccurred(),
+						"OADP BackupStorageLocation was not Available; abort cleanup cannot delete backups")
+				})
 
-				// Only create abort IBGU if not already Idle
-				if !isIdle {
+				By("Creating abort IBGU to complete rollback cleanup", func() {
 					abortIbguBuilder := ibgu.NewIbguBuilder(TargetHubAPIClient, "abortibgu", tsparams.IbguNamespace).
 						WithClusterLabelSelectors(tsparams.ClusterLabelSelector).
 						WithSeedImageRef(CNFConfig.IbguSeedImage, CNFConfig.IbguSeedImageVersion).
@@ -83,24 +95,42 @@ var _ = Describe(
 					abortIbguBuilder, err = abortIbguBuilder.Create()
 					Expect(err).ToNot(HaveOccurred(), "Failed to create abort Ibgu.")
 
-					_, err = abortIbguBuilder.WaitUntilComplete(5 * time.Minute)
+					_, err = abortIbguBuilder.WaitUntilComplete(cnfhelper.DefaultAbortIbguCompleteTimeout)
 					Expect(err).NotTo(HaveOccurred(), "abort IBGU did not complete in time.")
 
 					_, err = abortIbguBuilder.DeleteAndWait(1 * time.Minute)
 					Expect(err).ToNot(HaveOccurred(), "Failed to delete abort ibgu on target hub cluster")
-				} else {
-					klog.V(100).Infof("IBU already in Idle stage after auto-rollback, skipping abort IBGU")
-				}
+				})
+			} else {
+				klog.V(100).Infof("IBU already Prep-ready after auto-rollback, skipping abort IBGU")
+			}
 
-				// Sleep for 10 seconds to allow talm to reconcile state.
-				// Sometimes if the next test re-creates the IBGUs too quickly,
-				// the policies compliance status is not updated correctly.
-				time.Sleep(10 * time.Second)
-			})
+			// Sleep for 10 seconds to allow talm to reconcile state.
+			// Sometimes if the next test re-creates the IBGUs too quickly,
+			// the policies compliance status is not updated correctly.
+			time.Sleep(10 * time.Second)
 
 			By("Creating, enabling ibu finalize", func() {
 				_, err = ibu.WaitUntilStageComplete("Idle")
 				Expect(err).NotTo(HaveOccurred(), "error waiting for idle stage to complete")
+			})
+
+			By("Recover SR-IOV after rollback cleanup before the next IBU test", func() {
+				if sriovRecoveredBeforeAbort {
+					stable, checkErr := cnfhelper.IsSpokeSriovStablySynced(0)
+					Expect(checkErr).NotTo(HaveOccurred(), "Failed to check SR-IOV sync status after abort-path recovery")
+
+					if stable {
+						klog.V(100).Infof(
+							"SR-IOV still synced after abort-path recovery; skipping duplicate recovery")
+
+						return
+					}
+				}
+
+				err = cnfhelper.RecoverSpokeSriovAfterStaterootRollback(cnfhelper.DefaultSpokeIBUReadyTimeout)
+				Expect(err).NotTo(HaveOccurred(),
+					"SR-IOV did not recover after rollback cleanup; subsequent IBU tests may fail")
 			})
 
 			// Sleep for 10 seconds to allow talm to reconcile state.
@@ -251,6 +281,21 @@ var _ = Describe(
 				Expect(cnfclusterinfo.PreUpgradeClusterInfo.Version).
 					To(Equal(cnfclusterinfo.PostUpgradeClusterInfo.Version),
 						"Target sno cluster reports old cluster version")
+			})
+
+			By("Wait for IBU to become Prep-ready after auto-rollback when applicable", func() {
+				ibu, err = lca.PullImageBasedUpgrade(TargetSNOAPIClient)
+				Expect(err).NotTo(HaveOccurred(), "Failed to pull IBU resource after auto-rollback")
+
+				prepReady, err := cnfhelper.WaitForSpokeIBUPrepReadyOptional(cnfhelper.DefaultPostRollbackIBUIdleGrace)
+				Expect(err).NotTo(HaveOccurred(), "Failed while waiting for IBU Prep-ready after auto-rollback")
+
+				if prepReady {
+					klog.V(100).Infof("IBU became Prep-ready after auto-rollback; AfterEach can skip abort IBGU")
+				} else {
+					klog.V(100).Infof(
+						"IBU not Prep-ready within grace after auto-rollback; AfterEach will run abort cleanup")
+				}
 			})
 		})
 	})

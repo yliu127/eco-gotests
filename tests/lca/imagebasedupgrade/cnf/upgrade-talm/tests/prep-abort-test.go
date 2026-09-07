@@ -9,6 +9,7 @@ import (
 	"github.com/rh-ecosystem-edge/eco-goinfra/pkg/lca"
 	"github.com/rh-ecosystem-edge/eco-goinfra/pkg/reportxml"
 	"github.com/rh-ecosystem-edge/eco-gotests/tests/lca/imagebasedupgrade/cnf/internal/cnfclusterinfo"
+	"github.com/rh-ecosystem-edge/eco-gotests/tests/lca/imagebasedupgrade/cnf/internal/cnfhelper"
 	"github.com/rh-ecosystem-edge/eco-gotests/tests/lca/imagebasedupgrade/cnf/internal/cnfinittools"
 	"github.com/rh-ecosystem-edge/eco-gotests/tests/lca/imagebasedupgrade/cnf/upgrade-talm/internal/tsparams"
 )
@@ -25,6 +26,12 @@ var _ = Describe(
 
 				ibu, err = lca.PullImageBasedUpgrade(cnfinittools.TargetSNOAPIClient)
 				Expect(err).NotTo(HaveOccurred(), "error pulling ibu resource from cluster")
+			})
+
+			By("Ensure spoke IBU is Idle and Prep is a valid next stage", func() {
+				err = cnfhelper.EnsureSpokeReadyForIbgu(cnfhelper.DefaultSpokeIBUReadyTimeout)
+				Expect(err).ToNot(HaveOccurred(),
+					"Spoke IBU is not ready for Prep; leftover abort/finalize state can block this test")
 			})
 		})
 

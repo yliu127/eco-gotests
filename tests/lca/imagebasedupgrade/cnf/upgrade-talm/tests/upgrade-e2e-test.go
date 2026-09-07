@@ -48,6 +48,12 @@ var _ = Describe(
 				ibu, err = lca.PullImageBasedUpgrade(cnfinittools.TargetSNOAPIClient)
 				Expect(err).NotTo(HaveOccurred(), "error pulling ibu resource from cluster")
 			})
+
+			By("Ensure spoke IBU is Idle and Prep is a valid next stage", func() {
+				err := cnfhelper.EnsureSpokeReadyForIbgu(cnfhelper.DefaultSpokeIBUReadyTimeout)
+				Expect(err).ToNot(HaveOccurred(),
+					"Spoke IBU is not ready for Prep; leftover abort/finalize state can block happy path")
+			})
 		})
 
 		AfterEach(func() {
