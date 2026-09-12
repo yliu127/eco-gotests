@@ -234,6 +234,24 @@ var _ = Describe(
 			)
 			Expect(err).NotTo(HaveOccurred(),
 				tsparams.PreinstallServiceUnit+" must complete successfully on "+nodeInput.HostName)
+
+			By("Checking PAGE_SIZE and overlay runtimecfg sizes after preinstall")
+
+			overlayOutput, overlayErr := helpers.CheckOverlayRuntimecfg(
+				context.TODO(),
+				nodeInput.HostName,
+				tsparams.TargetNodeSSHUser,
+				ibiCfg.PreinstallSSHKey,
+			)
+
+			overlayReport := fmt.Sprintf(
+				"PAGE_SIZE and overlay runtimecfg on %s:\n%s",
+				nodeInput.HostName, overlayOutput)
+
+			fmt.Fprintln(GinkgoWriter, overlayReport)
+			klog.Info(overlayReport)
+
+			Expect(overlayErr).NotTo(HaveOccurred(), overlayReport)
 		})
 	},
 )
