@@ -25,6 +25,10 @@ const (
 	deleteResourceWaitTimeout = 5 * time.Minute
 )
 
+// skipPreinstallTeardown disables AfterEach/AfterAll hub and artifact cleanup so BMH,
+// secrets, work dir, and HTTP ISO remain for post-run investigation.
+const skipPreinstallTeardown = true
+
 // SpokeHostName is the resolved spoke hostname, set in BeforeAll for use by the
 // suite-level diagnostics collector.
 var SpokeHostName string
@@ -138,6 +142,11 @@ var _ = Describe(
 		})
 
 		AfterAll(func() {
+			if skipPreinstallTeardown {
+				klog.Info("skipPreinstallTeardown: leaving work dir and HTTP ISO in place")
+				return
+			}
+
 			if WorkDir != "" {
 				_ = os.RemoveAll(WorkDir)
 			}
@@ -148,6 +157,11 @@ var _ = Describe(
 		})
 
 		AfterEach(func() {
+			if skipPreinstallTeardown {
+				klog.Infof("skipPreinstallTeardown: leaving BMH %s and secret %s on hub", bmhName, bmcSecretName)
+				return
+			}
+
 			if bmhName == "" {
 				return
 			}
