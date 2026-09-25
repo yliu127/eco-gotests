@@ -73,7 +73,7 @@ searching /var/lib/containers/storage/overlay
 54354608 /var/lib/containers/storage/overlay/abc/diff/usr/bin/runtimecfg
 layers=139 empty_link=63 empty_lower=53
 zero_size_link_lower=116`,
-			wantErr: "empty link files",
+			wantErr: "found 116 zero-byte overlay link/lower files after preinstall",
 		},
 		{
 			name: "empty overlay lower metadata",
@@ -82,6 +82,24 @@ searching /var/lib/containers/storage/overlay
 54354608 /var/lib/containers/storage/overlay/abc/diff/usr/bin/runtimecfg
 layers=139 empty_link=0 empty_lower=53
 zero_size_link_lower=53`,
+			wantErr: "found 53 zero-byte overlay link/lower files after preinstall",
+		},
+		{
+			name: "empty overlay link metadata without zero_size summary",
+			output: `PAGE_SIZE=65536
+searching /var/lib/containers/storage/overlay
+54354608 /var/lib/containers/storage/overlay/abc/diff/usr/bin/runtimecfg
+layers=139 empty_link=2 empty_lower=0
+zero_size_link_lower=0`,
+			wantErr: "empty link files",
+		},
+		{
+			name: "empty overlay lower metadata without zero_size summary",
+			output: `PAGE_SIZE=65536
+searching /var/lib/containers/storage/overlay
+54354608 /var/lib/containers/storage/overlay/abc/diff/usr/bin/runtimecfg
+layers=139 empty_link=0 empty_lower=3
+zero_size_link_lower=0`,
 			wantErr: "empty lower files",
 		},
 		{
