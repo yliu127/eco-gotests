@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"strings"
 	"time"
 
 	"golang.org/x/crypto/ssh"
@@ -43,6 +44,39 @@ func SSHExec(parentCtx context.Context, host, user, sshKeyPath, command string) 
 	defer session.Close()
 
 	output, err := session.CombinedOutput(command)
+	if err != nil {
+		return string(output), wrapSSHError(ctx, err, string(output))
+	}
+
+	return string(output), nil
+}
+
+// SSHExecBashScript runs script on the remote host via "bash -s" with stdin.
+// Use this for multi-line checks; a plain SSHExec string may not run reliably
+// as a shell script on all servers.
+func SSHExecBashScript(parentCtx context.Context, host, user, sshKeyPath, script string) (string, error) {
+	klog.V(tsparams.LogLevel).Infof("Executing bash -s on %s@%s", user, host)
+
+	ctx, cancel := context.WithTimeout(parentCtx, sshSubprocessTimeout)
+	defer cancel()
+
+	client, err := dialSSH(ctx, host, user, sshKeyPath)
+	if err != nil {
+		return "", wrapSSHError(ctx, err, "")
+	}
+
+	defer client.Close()
+
+	session, err := client.NewSession()
+	if err != nil {
+		return "", wrapSSHError(ctx, err, "")
+	}
+
+	defer session.Close()
+
+	session.Stdin = strings.NewReader(script)
+
+	output, err := session.CombinedOutput("bash -s")
 	if err != nil {
 		return string(output), wrapSSHError(ctx, err, string(output))
 	}

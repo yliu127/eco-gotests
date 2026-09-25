@@ -20,7 +20,9 @@ func TestValidateOverlayRuntimecfgOutput(t *testing.T) {
 			name: "healthy arm64 runtimecfg",
 			output: `PAGE_SIZE=65536
 searching /var/lib/containers/storage/overlay
-54354608 /var/lib/containers/storage/overlay/abc/diff/usr/bin/runtimecfg`,
+54354608 /var/lib/containers/storage/overlay/abc/diff/usr/bin/runtimecfg
+layers=139 empty_link=0
+zero_size_link_lower=0`,
 			wantNoErr: true,
 		},
 		{
@@ -53,7 +55,28 @@ searching /var/lib/containers/storage/overlay
 			name: "found under live ISO mount",
 			output: `PAGE_SIZE=65536
 searching /mnt/var/lib/containers/storage/overlay
-51380224 /mnt/var/lib/containers/storage/overlay/abc/diff/usr/bin/runtimecfg`,
+51380224 /mnt/var/lib/containers/storage/overlay/abc/diff/usr/bin/runtimecfg
+layers=120 empty_link=0
+zero_size_link_lower=0`,
+			wantNoErr: true,
+		},
+		{
+			name: "empty overlay link metadata",
+			output: `PAGE_SIZE=65536
+searching /var/lib/containers/storage/overlay
+54354608 /var/lib/containers/storage/overlay/abc/diff/usr/bin/runtimecfg
+layers=139 empty_link=63
+zero_size_link_lower=116`,
+			wantErr: "empty link files",
+		},
+		{
+			name: "healthy with layer stats",
+			output: `PAGE_SIZE=65536
+active
+searching /var/lib/containers/storage/overlay
+54354608 /var/lib/containers/storage/overlay/abc/diff/usr/bin/runtimecfg
+layers=139 empty_link=0
+zero_size_link_lower=0`,
 			wantNoErr: true,
 		},
 	}

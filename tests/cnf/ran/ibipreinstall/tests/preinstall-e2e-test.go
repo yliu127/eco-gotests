@@ -249,7 +249,7 @@ var _ = Describe(
 			Expect(err).NotTo(HaveOccurred(),
 				tsparams.PreinstallServiceUnit+" must complete successfully on "+nodeInput.HostName)
 
-			By("Checking PAGE_SIZE and overlay runtimecfg sizes after preinstall")
+			By("Checking overlay storage (PAGE_SIZE, runtimecfg, empty link/lower) after preinstall")
 
 			overlayOutput, overlayErr := helpers.CheckOverlayRuntimecfg(
 				context.TODO(),
@@ -259,7 +259,7 @@ var _ = Describe(
 			)
 
 			overlayReport := fmt.Sprintf(
-				"PAGE_SIZE and overlay runtimecfg on %s:\n%s",
+				"overlay storage after preinstall on %s:\n%s",
 				nodeInput.HostName, overlayOutput)
 
 			fmt.Fprintln(GinkgoWriter, overlayReport)
