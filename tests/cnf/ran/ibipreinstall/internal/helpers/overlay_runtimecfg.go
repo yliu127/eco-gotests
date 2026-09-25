@@ -118,6 +118,19 @@ func CheckOverlayRuntimecfg(parentCtx context.Context, host, user, sshKeyPath st
 	return output, nil
 }
 
+// SyncFilesystems runs sync(8) on the preinstall node so overlay metadata on
+// /var/lib/containers is flushed before lab teardown (BMH delete / power-off).
+func SyncFilesystems(parentCtx context.Context, host, user, sshKeyPath string) error {
+	klog.V(tsparams.LogLevel).Infof("Syncing filesystems on %s after preinstall overlay check", host)
+
+	_, err := SSHExecRootBashScript(parentCtx, host, user, sshKeyPath, "sync\n")
+	if err != nil {
+		return fmt.Errorf("sync on %s failed: %w", host, err)
+	}
+
+	return nil
+}
+
 // validateOverlayRuntimecfgOutput requires overlay layers, non-empty link/lower
 // metadata, at least one runtimecfg, and rejects 16MiB runtimecfg copies.
 func validateOverlayRuntimecfgOutput(output string) error {

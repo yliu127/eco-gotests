@@ -252,6 +252,17 @@ var _ = Describe(
 			klog.Info(overlayReport)
 
 			Expect(overlayErr).NotTo(HaveOccurred(), overlayReport)
+
+			By("Syncing filesystems to disk before preinstall BMH teardown")
+
+			err = helpers.SyncFilesystems(
+				context.TODO(),
+				nodeInput.HostName,
+				tsparams.TargetNodeSSHUser,
+				ibiCfg.PreinstallSSHKey,
+			)
+			Expect(err).NotTo(HaveOccurred(),
+				"sync must succeed on "+nodeInput.HostName+" before BMH delete")
 		})
 	},
 )
