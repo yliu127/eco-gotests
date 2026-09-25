@@ -18,10 +18,13 @@ func TestValidateOverlayRuntimecfgOutput(t *testing.T) {
 	}{
 		{
 			name: "healthy arm64 runtimecfg",
-			output: `PAGE_SIZE=65536
+			output: `PAGE_SIZE=4096
+machine=aarch64
+active
 searching /var/lib/containers/storage/overlay
 54354608 /var/lib/containers/storage/overlay/abc/diff/usr/bin/runtimecfg
-layers=139 empty_link=0
+overlay_root=/var/lib/containers/storage/overlay
+layers=139 empty_link=0 empty_lower=0
 zero_size_link_lower=0`,
 			wantNoErr: true,
 		},
@@ -29,26 +32,28 @@ zero_size_link_lower=0`,
 			name: "truncated at 16MiB",
 			output: `PAGE_SIZE=65536
 searching /var/lib/containers/storage/overlay
-16777216 /var/lib/containers/storage/overlay/abc/diff/usr/bin/runtimecfg`,
+16777216 /var/lib/containers/storage/overlay/abc/diff/usr/bin/runtimecfg
+layers=139 empty_link=0 empty_lower=0`,
 			wantErr: "overlay runtimecfg truncated at 16MiB",
 		},
 		{
 			name: "page size only",
 			output: `PAGE_SIZE=65536
-`,
-			wantErr: "no overlay runtimecfg found after preinstall",
+layers=0 empty_link=0 empty_lower=0`,
+			wantErr: "no container overlay layers found",
 		},
 		{
 			name:    "empty output",
 			output:  "",
-			wantErr: "no overlay runtimecfg found after preinstall",
+			wantErr: "no container overlay layers found",
 		},
 		{
 			name: "one healthy and one truncated",
 			output: `PAGE_SIZE=65536
 searching /var/lib/containers/storage/overlay
 54354608 /var/lib/containers/storage/overlay/abc/diff/usr/bin/runtimecfg
-16777216 /mnt/var/lib/containers/storage/overlay/def/diff/usr/bin/runtimecfg`,
+16777216 /mnt/var/lib/containers/storage/overlay/def/diff/usr/bin/runtimecfg
+layers=139 empty_link=0 empty_lower=0`,
 			wantErr: "overlay runtimecfg truncated at 16MiB",
 		},
 		{
@@ -56,7 +61,8 @@ searching /var/lib/containers/storage/overlay
 			output: `PAGE_SIZE=65536
 searching /mnt/var/lib/containers/storage/overlay
 51380224 /mnt/var/lib/containers/storage/overlay/abc/diff/usr/bin/runtimecfg
-layers=120 empty_link=0
+overlay_root=/mnt/var/lib/containers/storage/overlay
+layers=120 empty_link=0 empty_lower=0
 zero_size_link_lower=0`,
 			wantNoErr: true,
 		},
@@ -65,19 +71,26 @@ zero_size_link_lower=0`,
 			output: `PAGE_SIZE=65536
 searching /var/lib/containers/storage/overlay
 54354608 /var/lib/containers/storage/overlay/abc/diff/usr/bin/runtimecfg
-layers=139 empty_link=63
+layers=139 empty_link=63 empty_lower=53
 zero_size_link_lower=116`,
 			wantErr: "empty link files",
 		},
 		{
-			name: "healthy with layer stats",
+			name: "empty overlay lower metadata",
 			output: `PAGE_SIZE=65536
-active
 searching /var/lib/containers/storage/overlay
 54354608 /var/lib/containers/storage/overlay/abc/diff/usr/bin/runtimecfg
-layers=139 empty_link=0
+layers=139 empty_link=0 empty_lower=53
+zero_size_link_lower=53`,
+			wantErr: "empty lower files",
+		},
+		{
+			name: "layers but missing runtimecfg",
+			output: `PAGE_SIZE=65536
+overlay_root=/var/lib/containers/storage/overlay
+layers=139 empty_link=0 empty_lower=0
 zero_size_link_lower=0`,
-			wantNoErr: true,
+			wantErr: "no overlay runtimecfg found after preinstall",
 		},
 	}
 

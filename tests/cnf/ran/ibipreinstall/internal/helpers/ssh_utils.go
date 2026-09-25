@@ -55,7 +55,18 @@ func SSHExec(parentCtx context.Context, host, user, sshKeyPath, command string) 
 // Use this for multi-line checks; a plain SSHExec string may not run reliably
 // as a shell script on all servers.
 func SSHExecBashScript(parentCtx context.Context, host, user, sshKeyPath, script string) (string, error) {
-	klog.V(tsparams.LogLevel).Infof("Executing bash -s on %s@%s", user, host)
+	return sshExecBashScript(parentCtx, host, user, sshKeyPath, script, "bash -s")
+}
+
+// SSHExecRootBashScript runs script as root via "sudo bash -s" (passwordless
+// sudo for core on RHCOS preinstall). Use when the script reads root-only
+// paths such as /var/lib/containers/storage.
+func SSHExecRootBashScript(parentCtx context.Context, host, user, sshKeyPath, script string) (string, error) {
+	return sshExecBashScript(parentCtx, host, user, sshKeyPath, script, "sudo bash -s")
+}
+
+func sshExecBashScript(parentCtx context.Context, host, user, sshKeyPath, script, shellCmd string) (string, error) {
+	klog.V(tsparams.LogLevel).Infof("Executing %s on %s@%s", shellCmd, user, host)
 
 	ctx, cancel := context.WithTimeout(parentCtx, sshSubprocessTimeout)
 	defer cancel()
@@ -76,7 +87,7 @@ func SSHExecBashScript(parentCtx context.Context, host, user, sshKeyPath, script
 
 	session.Stdin = strings.NewReader(script)
 
-	output, err := session.CombinedOutput("bash -s")
+	output, err := session.CombinedOutput(shellCmd)
 	if err != nil {
 		return string(output), wrapSSHError(ctx, err, string(output))
 	}
