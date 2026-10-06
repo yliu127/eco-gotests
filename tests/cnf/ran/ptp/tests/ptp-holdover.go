@@ -196,7 +196,7 @@ func assertHoldoverInSpecToLocked(
 
 	changeHoldoverSettings(testData, pluginSettings, expected.Locked, clockClassChanges, timeout)
 
-	By("setting upstream clock interfaces down to enter holdover-in-spec")
+	By("dropping upstream PTP to enter holdover-in-spec")
 
 	ifaceDownTime := time.Now()
 
@@ -204,20 +204,18 @@ func assertHoldoverInSpecToLocked(
 		restoreInterfacesAndWaitForRelock(testData.PrometheusAPI, testData.NodeName, testData.UpstreamIfaces)
 	})
 
-	err := iface.SetInterfacesStatus(RANConfig.Spoke1APIClient,
-		testData.NodeName, testData.UpstreamIfaces, iface.InterfaceStateDown)
-	Expect(err).ToNot(HaveOccurred(), "Failed to set upstream clock interfaces down")
+	err := iface.DropUpstreamPTP(RANConfig.Spoke1APIClient, testData.NodeName, testData.UpstreamIfaces)
+	Expect(err).ToNot(HaveOccurred(), "Failed to drop upstream PTP on node %s", testData.NodeName)
 
 	assertHoldoverState(testData.PrometheusAPI, testData.NodeName, ifaceDownTime,
 		expected.HoldoverInSpec, clockClassChanges, timeout, true, testData.ConfigFile)
 
-	By("setting upstream clock interfaces up to return to locked")
+	By("restoring upstream PTP to return to locked")
 
 	ifaceUpTime := time.Now()
 
-	err = iface.SetInterfacesStatus(RANConfig.Spoke1APIClient,
-		testData.NodeName, testData.UpstreamIfaces, iface.InterfaceStateUp)
-	Expect(err).ToNot(HaveOccurred(), "Failed to set upstream clock interfaces up")
+	err = iface.RestoreUpstreamPTP(RANConfig.Spoke1APIClient, testData.NodeName, testData.UpstreamIfaces)
+	Expect(err).ToNot(HaveOccurred(), "Failed to restore upstream PTP on node %s", testData.NodeName)
 
 	assertLockedState(testData.PrometheusAPI, testData.NodeName, ifaceUpTime,
 		expected.Locked, clockClassChanges, timeout, testData.UpstreamIfaces, testData.ConfigFile)
@@ -238,7 +236,7 @@ func assertHoldoverInSpecToFreerun(
 
 	changeHoldoverSettings(testData, pluginSettings, expected.Locked, clockClassChanges, timeout)
 
-	By("setting upstream clock interfaces down to enter holdover-in-spec")
+	By("dropping upstream PTP to enter holdover-in-spec")
 
 	ifaceDownTime := time.Now()
 
@@ -246,9 +244,8 @@ func assertHoldoverInSpecToFreerun(
 		restoreInterfacesAndWaitForRelock(testData.PrometheusAPI, testData.NodeName, testData.UpstreamIfaces)
 	})
 
-	err := iface.SetInterfacesStatus(RANConfig.Spoke1APIClient,
-		testData.NodeName, testData.UpstreamIfaces, iface.InterfaceStateDown)
-	Expect(err).ToNot(HaveOccurred(), "Failed to set upstream clock interfaces down")
+	err := iface.DropUpstreamPTP(RANConfig.Spoke1APIClient, testData.NodeName, testData.UpstreamIfaces)
+	Expect(err).ToNot(HaveOccurred(), "Failed to drop upstream PTP on node %s", testData.NodeName)
 
 	assertHoldoverState(testData.PrometheusAPI, testData.NodeName, ifaceDownTime,
 		expected.HoldoverInSpec, clockClassChanges, timeout, true, testData.ConfigFile)
@@ -256,13 +253,12 @@ func assertHoldoverInSpecToFreerun(
 	assertFreerunState(testData.PrometheusAPI, testData.NodeName, ifaceDownTime,
 		expected.Freerun, clockClassChanges, timeout, testData.ConfigFile)
 
-	By("setting upstream clock interfaces up to return to locked")
+	By("restoring upstream PTP to return to locked")
 
 	ifaceUpTime := time.Now()
 
-	err = iface.SetInterfacesStatus(RANConfig.Spoke1APIClient,
-		testData.NodeName, testData.UpstreamIfaces, iface.InterfaceStateUp)
-	Expect(err).ToNot(HaveOccurred(), "Failed to set upstream clock interfaces up")
+	err = iface.RestoreUpstreamPTP(RANConfig.Spoke1APIClient, testData.NodeName, testData.UpstreamIfaces)
+	Expect(err).ToNot(HaveOccurred(), "Failed to restore upstream PTP on node %s", testData.NodeName)
 
 	assertLockedState(testData.PrometheusAPI, testData.NodeName, ifaceUpTime,
 		expected.Locked, clockClassChanges, timeout, testData.UpstreamIfaces, testData.ConfigFile)
@@ -282,7 +278,7 @@ func assertHoldoverInSpecToOutOfSpec(
 
 	changeHoldoverSettings(testData, pluginSettings, expected.Locked, clockClassChanges, timeout)
 
-	By("setting upstream clock interfaces down to enter holdover-in-spec")
+	By("dropping upstream PTP to enter holdover-in-spec")
 
 	ifaceDownTime := time.Now()
 
@@ -290,9 +286,8 @@ func assertHoldoverInSpecToOutOfSpec(
 		restoreInterfacesAndWaitForRelock(testData.PrometheusAPI, testData.NodeName, testData.UpstreamIfaces)
 	})
 
-	err := iface.SetInterfacesStatus(RANConfig.Spoke1APIClient,
-		testData.NodeName, testData.UpstreamIfaces, iface.InterfaceStateDown)
-	Expect(err).ToNot(HaveOccurred(), "Failed to set upstream clock interfaces down")
+	err := iface.DropUpstreamPTP(RANConfig.Spoke1APIClient, testData.NodeName, testData.UpstreamIfaces)
+	Expect(err).ToNot(HaveOccurred(), "Failed to drop upstream PTP on node %s", testData.NodeName)
 
 	assertHoldoverState(testData.PrometheusAPI, testData.NodeName, ifaceDownTime,
 		expected.HoldoverInSpec, clockClassChanges, timeout, true, testData.ConfigFile)
@@ -300,13 +295,12 @@ func assertHoldoverInSpecToOutOfSpec(
 	assertHoldoverOutOfSpecClockClass(testData.PrometheusAPI, testData.NodeName, ifaceDownTime,
 		expected.HoldoverOutOfSpec, clockClassChanges, timeout, testData.ConfigFile)
 
-	By("setting upstream clock interfaces up to return to locked")
+	By("restoring upstream PTP to return to locked")
 
 	ifaceUpTime := time.Now()
 
-	err = iface.SetInterfacesStatus(RANConfig.Spoke1APIClient,
-		testData.NodeName, testData.UpstreamIfaces, iface.InterfaceStateUp)
-	Expect(err).ToNot(HaveOccurred(), "Failed to set upstream clock interfaces up")
+	err = iface.RestoreUpstreamPTP(RANConfig.Spoke1APIClient, testData.NodeName, testData.UpstreamIfaces)
+	Expect(err).ToNot(HaveOccurred(), "Failed to restore upstream PTP on node %s", testData.NodeName)
 
 	assertLockedState(testData.PrometheusAPI, testData.NodeName, ifaceUpTime,
 		expected.Locked, clockClassChanges, timeout, testData.UpstreamIfaces, testData.ConfigFile)
@@ -327,7 +321,7 @@ func assertHoldoverOutOfSpecToFreerun(
 
 	changeHoldoverSettings(testData, pluginSettings, expected.Locked, clockClassChanges, timeout)
 
-	By("setting upstream clock interfaces down to enter holdover-in-spec")
+	By("dropping upstream PTP to enter holdover-in-spec")
 
 	ifaceDownTime := time.Now()
 
@@ -335,9 +329,8 @@ func assertHoldoverOutOfSpecToFreerun(
 		restoreInterfacesAndWaitForRelock(testData.PrometheusAPI, testData.NodeName, testData.UpstreamIfaces)
 	})
 
-	err := iface.SetInterfacesStatus(RANConfig.Spoke1APIClient,
-		testData.NodeName, testData.UpstreamIfaces, iface.InterfaceStateDown)
-	Expect(err).ToNot(HaveOccurred(), "Failed to set upstream clock interfaces down")
+	err := iface.DropUpstreamPTP(RANConfig.Spoke1APIClient, testData.NodeName, testData.UpstreamIfaces)
+	Expect(err).ToNot(HaveOccurred(), "Failed to drop upstream PTP on node %s", testData.NodeName)
 
 	assertHoldoverState(testData.PrometheusAPI, testData.NodeName, ifaceDownTime,
 		expected.HoldoverInSpec, clockClassChanges, timeout, true, testData.ConfigFile)
@@ -348,13 +341,12 @@ func assertHoldoverOutOfSpecToFreerun(
 	assertFreerunState(testData.PrometheusAPI, testData.NodeName, ifaceDownTime,
 		expected.Freerun, clockClassChanges, timeout, testData.ConfigFile)
 
-	By("setting upstream clock interfaces up to return to locked")
+	By("restoring upstream PTP to return to locked")
 
 	ifaceUpTime := time.Now()
 
-	err = iface.SetInterfacesStatus(RANConfig.Spoke1APIClient,
-		testData.NodeName, testData.UpstreamIfaces, iface.InterfaceStateUp)
-	Expect(err).ToNot(HaveOccurred(), "Failed to set upstream clock interfaces up")
+	err = iface.RestoreUpstreamPTP(RANConfig.Spoke1APIClient, testData.NodeName, testData.UpstreamIfaces)
+	Expect(err).ToNot(HaveOccurred(), "Failed to restore upstream PTP on node %s", testData.NodeName)
 
 	assertLockedState(testData.PrometheusAPI, testData.NodeName, ifaceUpTime,
 		expected.Locked, clockClassChanges, timeout, testData.UpstreamIfaces, testData.ConfigFile)
@@ -752,7 +744,7 @@ func getPtp4lConfigFileForNode(nodeName string) string {
 	return configFile
 }
 
-// restoreInterfacesAndWaitForRelock brings the upstream interfaces back up and waits for the T-BC clock to return
+// restoreInterfacesAndWaitForRelock removes the upstream PTP drop and waits for the T-BC clock to return
 // to LOCKED state with a 5-second stable duration, matching the OC 2-port restore pattern. The process label
 // is T-BC because the linuxptp-daemon uses the clockType from PtpSettings (set to "T-BC" for T-BC profiles)
 // as the process label for clock state metrics. T-TSC profiles use the same shared helpers and the same process
@@ -764,10 +756,10 @@ func restoreInterfacesAndWaitForRelock(
 ) {
 	GinkgoHelper()
 
-	By("restoring upstream interfaces and waiting for relock")
+	By("restoring upstream PTP and waiting for relock")
 
-	err := iface.SetInterfacesStatus(RANConfig.Spoke1APIClient, nodeName, upstreamIfaces, iface.InterfaceStateUp)
-	Expect(err).ToNot(HaveOccurred(), "Failed to restore upstream clock interfaces")
+	err := iface.RestoreUpstreamPTP(RANConfig.Spoke1APIClient, nodeName, upstreamIfaces)
+	Expect(err).ToNot(HaveOccurred(), "Failed to restore upstream PTP on node %s", nodeName)
 
 	clockStateQuery := metrics.ClockStateQuery{
 		Node:    metrics.Equals(nodeName),

@@ -78,15 +78,15 @@ var _ = Describe("PTP Dual T-BC", Label(tsparams.LabelDualTBC), func() {
 	})
 })
 
-// assertDualTBCFailoverToBackup brings the active (SLAVE) time-receiver port down, waits for HOLDOVER
-// (clock class 135), then LOCKED (clock class 6) once the backup port takes over. The original port
-// stays down for the duration of the assertions and is restored in cleanup.
+// assertDualTBCFailoverToBackup drops L2 PTP on the active (SLAVE) time-receiver port, waits for HOLDOVER
+// (clock class 135), then LOCKED (clock class 6) once the backup port takes over. The link stays up and
+// the active port remains LISTENING until cleanup restores upstream PTP.
 func assertDualTBCFailoverToBackup(testData profiles.HoldoverTestData, timeout time.Duration) {
 	GinkgoHelper()
 
 	activeIface, backupIface := dualTBCActiveBackupInterfaces(testData)
 
-	By(fmt.Sprintf("setting active upstream interface %s down to trigger failover to %s",
+	By(fmt.Sprintf("dropping upstream PTP on active interface %s to trigger failover to %s",
 		activeIface, backupIface))
 
 	ifaceDownTime := time.Now()
@@ -95,10 +95,9 @@ func assertDualTBCFailoverToBackup(testData profiles.HoldoverTestData, timeout t
 		restoreInterfacesAndWaitForRelock(testData.PrometheusAPI, testData.NodeName, testData.UpstreamIfaces)
 	})
 
-	err := iface.SetInterfaceStatus(RANConfig.Spoke1APIClient, testData.NodeName,
-		activeIface, iface.InterfaceStateDown)
+	err := iface.DropUpstreamPTP(RANConfig.Spoke1APIClient, testData.NodeName, []iface.Iface{activeIface})
 	Expect(err).ToNot(HaveOccurred(),
-		"Failed to set active upstream interface %s down on node %s", activeIface, testData.NodeName)
+		"Failed to drop upstream PTP on interface %s on node %s", activeIface, testData.NodeName)
 
 	assertHoldoverState(testData.PrometheusAPI, testData.NodeName, ifaceDownTime,
 		profiles.TBCClockClasses().HoldoverInSpec, true, timeout, false, testData.ConfigFile)
@@ -112,9 +111,9 @@ func assertDualTBCFailoverToBackup(testData profiles.HoldoverTestData, timeout t
 		Interface: metrics.Equals(activeIface),
 		Node:      metrics.Equals(testData.NodeName),
 		Process:   metrics.Equals(metrics.ProcessPTP4L),
-	}, metrics.InterfaceRoleFaulty, metrics.AssertWithTimeout(1*time.Minute))
+	}, metrics.InterfaceRoleListening, metrics.AssertWithTimeout(1*time.Minute))
 	Expect(err).ToNot(HaveOccurred(),
-		"expected interface %s to be FAULTY on node %s", activeIface, testData.NodeName)
+		"expected interface %s to be LISTENING on node %s", activeIface, testData.NodeName)
 
 	err = metrics.AssertQuery(context.TODO(), testData.PrometheusAPI, metrics.InterfaceRoleQuery{
 		Interface: metrics.Equals(backupIface),
@@ -125,8 +124,8 @@ func assertDualTBCFailoverToBackup(testData profiles.HoldoverTestData, timeout t
 		"expected interface %s to be FOLLOWER on node %s", backupIface, testData.NodeName)
 }
 
-// assertDualTBCHoldoverInSpecToFreerun brings both time-receiver ports down, waits for HOLDOVER then FREERUN,
-// and asserts both ports are FAULTY. Cleanup restores ports via DeferCleanup.
+// assertDualTBCHoldoverInSpecToFreerun drops L2 PTP on both time-receiver ports, waits for HOLDOVER then
+// FREERUN, and asserts both ports are LISTENING. Cleanup restores upstream PTP via DeferCleanup.
 func assertDualTBCHoldoverInSpecToFreerun(
 	testData profiles.HoldoverTestData,
 	pluginSettings profiles.HoldoverPluginSettings,
@@ -137,7 +136,7 @@ func assertDualTBCHoldoverInSpecToFreerun(
 
 	changeHoldoverSettings(testData, pluginSettings, expected.Locked, true, timeout)
 
-	By("setting both upstream clock interfaces down to enter holdover-in-spec")
+	By("dropping upstream PTP on both interfaces to enter holdover-in-spec")
 
 	ifaceDownTime := time.Now()
 
@@ -145,9 +144,8 @@ func assertDualTBCHoldoverInSpecToFreerun(
 		restoreInterfacesAndWaitForRelock(testData.PrometheusAPI, testData.NodeName, testData.UpstreamIfaces)
 	})
 
-	err := iface.SetInterfacesStatus(RANConfig.Spoke1APIClient,
-		testData.NodeName, testData.UpstreamIfaces, iface.InterfaceStateDown)
-	Expect(err).ToNot(HaveOccurred(), "Failed to set upstream clock interfaces down")
+	err := iface.DropUpstreamPTP(RANConfig.Spoke1APIClient, testData.NodeName, testData.UpstreamIfaces)
+	Expect(err).ToNot(HaveOccurred(), "Failed to drop upstream PTP on node %s", testData.NodeName)
 
 	assertHoldoverState(testData.PrometheusAPI, testData.NodeName, ifaceDownTime,
 		expected.HoldoverInSpec, true, timeout, true, testData.ConfigFile)
@@ -155,16 +153,16 @@ func assertDualTBCHoldoverInSpecToFreerun(
 	assertFreerunState(testData.PrometheusAPI, testData.NodeName, ifaceDownTime,
 		expected.Freerun, true, timeout, testData.ConfigFile)
 
-	By("validating both upstream interfaces are FAULTY")
+	By("validating both upstream interfaces are LISTENING")
 
 	for _, ifn := range testData.UpstreamIfaces {
 		err := metrics.AssertQuery(context.TODO(), testData.PrometheusAPI, metrics.InterfaceRoleQuery{
 			Interface: metrics.Equals(ifn),
 			Node:      metrics.Equals(testData.NodeName),
 			Process:   metrics.Equals(metrics.ProcessPTP4L),
-		}, metrics.InterfaceRoleFaulty, metrics.AssertWithTimeout(1*time.Minute))
+		}, metrics.InterfaceRoleListening, metrics.AssertWithTimeout(1*time.Minute))
 		Expect(err).ToNot(HaveOccurred(),
-			"expected interface %s to be FAULTY on node %s", ifn, testData.NodeName)
+			"expected interface %s to be LISTENING on node %s", ifn, testData.NodeName)
 	}
 }
 
